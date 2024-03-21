@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+
 // ABI register mappings
 #define RV_ZERO      0
 #define RV_RA        1
@@ -12,6 +13,7 @@
 #define RV_A2       12
 #define RV_A3       13
 #define RV_NUM_REGS 32
+
 
 // Opcodes for instr formats
 typedef enum {
@@ -45,6 +47,8 @@ typedef struct {
     int b_taken;
     int b_not_taken;
 } rv_analysis;
+
+
 
 // Cache types
 typedef enum {CACHE_NONE, CACHE_DM, CACHE_SA} cache_type; 
@@ -89,6 +93,7 @@ typedef struct {
 
     rv_analysis  analysis;
     struct cache_st i_cache;
+    uint8_t memory[STACK_SIZE];
 } rv_state;
 
 

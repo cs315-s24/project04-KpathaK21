@@ -1,4 +1,5 @@
 .global get_bitseq_s
+.align 4
 
 /* get_bitseq_s returns a specified range of bits within a number as unigned
     a0 is the number

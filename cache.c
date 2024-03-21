@@ -2,7 +2,8 @@
 #include <stdlib.h>
 
 #include "rv_emu.h"
-    
+
+
 void cache_init(struct cache_st *csp) {
 
     if (csp->type == CACHE_NONE) {

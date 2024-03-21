@@ -1,4 +1,5 @@
 .global find_max_index_s
+.align 4 
 
 /* find_max_index_s finds the index of the largest value
     a0 = array

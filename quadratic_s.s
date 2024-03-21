@@ -1,7 +1,7 @@
 #! riscv
 
 .global quadratic_s
-
+.align 4
 /* quadratic_s calculates the quadratic equation where
     a0 = x
     a1 = a

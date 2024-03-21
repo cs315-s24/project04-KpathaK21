@@ -1,4 +1,5 @@
 .global max3_s
+.align 4
 
 # Return the max of a0 and a1
 max2_s:

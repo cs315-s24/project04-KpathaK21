@@ -1,6 +1,6 @@
 .global find_max_index_s
 .global sort_s
-
+.align 4
 /* sort_s sorts an array of 32-bit integers in-place,
    in descending order
     a0 is the address of the array
