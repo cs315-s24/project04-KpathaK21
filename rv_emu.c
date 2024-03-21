@@ -30,48 +30,16 @@ static uint32_t get_rs2(uint32_t iw) {
     return get_bits(iw, 20, 5);
 }
 
-// Function to extract and sign-extend the immediate value for S-type instructions
 static int64_t sb_offset(uint32_t iw) {
-    // Extracting relevant bits from the instruction word
     uint32_t bit11 = get_bit(iw, 7);
     uint32_t bit12 = get_bit(iw, 31);
     uint32_t bits10_5 = get_bits(iw, 25, 6);
     uint32_t bits4_1 = get_bits(iw, 8, 4);
+    uint32_t offset = 0;
     
-    // Combining the extracted bits to form the offset
-    uint32_t offset = (bit12 << 12) | (bit11 << 11) | (bits10_5 << 5) | (bits4_1 << 1);
-    
-    // Sign-extending the offset to 64 bits
+    offset |= (bit12 << 12) | (bit11 << 11) | (bits10_5 << 5) | (bits4_1 << 1);
     int64_t signed_offset = sign_extend(offset, 13);
-    
     return signed_offset;
-}
-
-static void run_s_format(rv_state *s, uint32_t iw) {
-    uint32_t func3 = get_funct3(iw);
-    uint64_t v1 = s->regs[get_rs1(iw)];
-    uint64_t v2 = s->regs[get_rs2(iw)];
-    int64_t imm = sign_extend((get_bits(iw, 25, 7) << 5) | get_bits(iw, 7, 5), 12);
-
-    uint64_t address = v1 + imm;
-
-    // Check if the calculated address is within bounds
-    if (address >= RV_NUM_REGS) {
-        printf("Error: Attempted to access memory out of bounds.\n");
-        exit(-1); 
-    }
-    
-    switch (func3) {
-        case 0b010:  // sw
-            s->regs[address] = (uint32_t)v2;
-            break;
-        case 0b011:  // sd
-            s->regs[address] = v2;
-            break;
-        default:
-            unsupported("s format func3", func3);
-    } 
-    s->pc += 4;
 }
 
 
@@ -121,8 +89,6 @@ static void run_i_format(rv_state *s, uint32_t iw, rv_format fmt) {
     int64_t imm = sign_extend(imm_unsigned, 12);
     uint32_t shamt = get_bits(iw, 20, 5);
     int64_t sum = v1 + imm;
-
-
         
     switch (func3) {
         case 0b0:  // addi
@@ -141,6 +107,19 @@ static void run_i_format(rv_state *s, uint32_t iw, rv_format fmt) {
                 s->regs[rd] = ((int64_t) v1) >> shamt;
             else
                 s->regs[rd] = v1 >> shamt;
+            break;
+            break;
+        case 0b100: // lb
+            s->regs[rd] = (int64_t)(*(int8_t*)(s->regs[get_rs1(iw)] + imm));
+            break;
+        case 0b011: // ld
+            s->regs[rd] = *((int64_t*)(s->regs[get_rs1(iw)] + imm));
+            break;
+        case 0b010: // lw
+            s->regs[rd] = *((int32_t*)(s->regs[get_rs1(iw)] + imm));
+            break;
+        case 0b110: // li
+            s->regs[rd] = imm;
             break;
 
         default:
