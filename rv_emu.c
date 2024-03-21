@@ -30,22 +30,47 @@ static uint32_t get_rs2(uint32_t iw) {
     return get_bits(iw, 20, 5);
 }
 
+// Function to extract and sign-extend the immediate value for S-type instructions
+static int64_t sb_offset(uint32_t iw) {
+    // Extracting relevant bits from the instruction word
+    uint32_t bit11 = get_bit(iw, 7);
+    uint32_t bit12 = get_bit(iw, 31);
+    uint32_t bits10_5 = get_bits(iw, 25, 6);
+    uint32_t bits4_1 = get_bits(iw, 8, 4);
+    
+    // Combining the extracted bits to form the offset
+    uint32_t offset = (bit12 << 12) | (bit11 << 11) | (bits10_5 << 5) | (bits4_1 << 1);
+    
+    // Sign-extending the offset to 64 bits
+    int64_t signed_offset = sign_extend(offset, 13);
+    
+    return signed_offset;
+}
+
 static void run_s_format(rv_state *s, uint32_t iw) {
     uint32_t func3 = get_funct3(iw);
     uint64_t v1 = s->regs[get_rs1(iw)];
     uint64_t v2 = s->regs[get_rs2(iw)];
     int64_t imm = sign_extend((get_bits(iw, 25, 7) << 5) | get_bits(iw, 7, 5), 12);
 
+    uint64_t address = v1 + imm;
+
+    // Check if the calculated address is within bounds
+    if (address >= RV_NUM_REGS) {
+        printf("Error: Attempted to access memory out of bounds.\n");
+        exit(-1); 
+    }
+    
     switch (func3) {
         case 0b010:  // sw
-            s->regs[v1 + imm] = (uint32_t)v2;
+            s->regs[address] = (uint32_t)v2;
             break;
         case 0b011:  // sd
-            s->regs[v1 + imm] = v2;
+            s->regs[address] = v2;
             break;
         default:
             unsupported("s format func3", func3);
-    }
+    } 
     s->pc += 4;
 }
 
@@ -97,6 +122,8 @@ static void run_i_format(rv_state *s, uint32_t iw, rv_format fmt) {
     uint32_t shamt = get_bits(iw, 20, 5);
     int64_t sum = v1 + imm;
 
+
+        
     switch (func3) {
         case 0b0:  // addi
             if (fmt == FMT_I_JALR)
@@ -104,7 +131,8 @@ static void run_i_format(rv_state *s, uint32_t iw, rv_format fmt) {
             else if (fmt == FMT_I_ARITH)
                 s->regs[rd] = sum;  // arithmetic sum
             break;
-        case 0b001:  // slli
+
+       case 0b001:  // slli
             s->regs[rd] = v1 << shamt;
             break;
         case 0b101:  // srXi
@@ -114,25 +142,17 @@ static void run_i_format(rv_state *s, uint32_t iw, rv_format fmt) {
             else
                 s->regs[rd] = v1 >> shamt;
             break;
+
         default:
             unsupported("i format func3", func3);
     }
 
     if (fmt != FMT_I_JALR)
-                s->pc += 4;
+        s->pc += 4;
+
 }
 
-static int64_t sb_offset(uint32_t iw) {
-    uint32_t bit11 = get_bit(iw, 7);
-    uint32_t bit12 = get_bit(iw, 31);
-    uint32_t bits10_5 = get_bits(iw, 25, 6);
-    uint32_t bits4_1 = get_bits(iw, 8, 4);
-    uint32_t offset = 0;
-    
-    offset |= (bit12 << 12) | (bit11 << 11) | (bits10_5 << 5) | (bits4_1 << 1);
-    int64_t signed_offset = sign_extend(offset, 13);
-    return signed_offset;
-}
+
 
 static void run_sb_format(rv_state *s, uint32_t iw) {
     uint32_t func3 = get_funct3(iw);
@@ -188,6 +208,8 @@ static void run_uj_format(rv_state *s, uint32_t iw) {
     int64_t signed_offset = sign_extend(offset, 20) * 2;
     s->pc += signed_offset;
 }
+
+
 
 static void rv_one(rv_state *state) {
   uint32_t iw = *((uint32_t*) state->pc);
@@ -247,10 +269,9 @@ static void rv_one(rv_state *state) {
       run_uj_format(state, iw);
       break;
 	case FMT_S:
-    	// Handle Store instructions
-    	run_s_format(state, iw);
-    	break;
-
+      state->analysis.ir_count++;
+      run_s_format(state, iw);
+      break;
     default:
       unsupported("format", opcode);
     
