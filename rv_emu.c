@@ -15,6 +15,7 @@ static void unsupported(char *s, uint32_t n) {
 }
 
 
+// Function to build a 4-bit immediate value from smaller components
 
 uint32_t build_imm4(uint32_t imm4, uint32_t imm3, uint32_t imm2, uint32_t imm1,
                     int len3, int len2, int len1)
@@ -31,7 +32,7 @@ uint32_t build_imm4(uint32_t imm4, uint32_t imm3, uint32_t imm2, uint32_t imm1,
     return imm;
 }
 
-
+// Function to emulate RISC-V B-type instructions
 static void emu_b_type(rv_state *state, uint32_t iw) {
     uint32_t funct3 = get_bits(iw, 12, 3);
     uint32_t rs1 = get_bits(iw, 15, 5);
@@ -46,6 +47,7 @@ static void emu_b_type(rv_state *state, uint32_t iw) {
     
  	bool branch_taken = false;
 
+// Check branch condition based on funct3
 if (funct3 == 0b001)
     { 
         if (state->regs[rs1] != state->regs[rs2])
@@ -79,6 +81,8 @@ if (funct3 == 0b001)
         unsupported("b-type funct3", funct3);
     }
 
+    
+  // Update program counter based on branch result
  
     if (branch_taken)
     {
@@ -92,6 +96,7 @@ if (funct3 == 0b001)
     }
 }
 
+// Function to emulate RISC-V I-type instructions
 void emu_i_type(rv_state *state, uint32_t iw)
 {
     
@@ -103,6 +108,7 @@ void emu_i_type(rv_state *state, uint32_t iw)
     int64_t imm = sign_extend(immu, 12);
     uint64_t dest = state->regs[rs1] + imm;
 
+// Handle different I-type instructions based on opcode and funct3
    if (opcode == FMT_I_ARITH)
     { 
         if (funct3 == 0b000)
@@ -125,7 +131,7 @@ void emu_i_type(rv_state *state, uint32_t iw)
         }
         state->analysis.ir_count += 1;
     }
-
+// Handle load instructions
    else
     { 
         if (funct3 == 0b000)
@@ -150,6 +156,8 @@ void emu_i_type(rv_state *state, uint32_t iw)
     state->pc += 4; 
 }
 
+// Function to emulate RISC-V JAL instruction
+
 static void emu_jal(rv_state *state, uint32_t iw)
 {
     uint32_t rd = get_bits(iw, 7, 5); 
@@ -162,8 +170,9 @@ static void emu_jal(rv_state *state, uint32_t iw)
     int32_t imm = imm20 | imm19_12 | imm11 | imm10_1;
     imm = sign_extend(imm, 21); 
 
-    
-    if (rd != 0)
+
+// Store return address if rd is not zero
+     if (rd != 0)
     { 
         state->regs[rd] = state->pc + 4;
     }
@@ -177,8 +186,11 @@ void emu_jalr(rv_state *state, uint32_t iw)
     uint32_t rs1 = (iw >> 15) & 0b1111; 
     uint64_t val = state->regs[rs1];   
 
+// Update program counter with jump offset
     state->pc = val; 
 }
+
+// Function to emulate RISC-V JALR instruction
 
 static void emu_r_type(rv_state *state, uint32_t iw) {
    uint32_t rd = get_bits(iw, 7, 5);
@@ -188,6 +200,7 @@ static void emu_r_type(rv_state *state, uint32_t iw) {
     uint32_t funct7 = get_bits(iw, 25, 7);
     uint32_t opcode = get_bits(iw, 0, 7);
 
+// Perform different operations based on funct3 and funct7
     if (funct3 == 0b000 && funct7 == 0b0000000)
     { 
         state->regs[rd] = state->regs[rs1] + state->regs[rs2];
@@ -247,6 +260,7 @@ static void emu_mv(rv_state *state, uint32_t rd, uint32_t rs1)
     state->regs[rd] = state->regs[rs1];
 }
 
+// Function to emulate RISC-V store instructions
 static void emu_store(rv_state *state, uint32_t iw)
 {
     uint32_t rs1 = get_bits(iw, 15, 5);                                             
@@ -256,6 +270,7 @@ static void emu_store(rv_state *state, uint32_t iw)
 
     uint64_t addr = state->regs[rs1] + imm; // Calculate address
 
+  // Store data to memory based on function code
     switch (funct3)
     {
     case LDST_BYTE: 
@@ -278,6 +293,7 @@ static void emu_store(rv_state *state, uint32_t iw)
     state->pc += 4; 
 }
 
+// Function to emulate RISC-V load instructions
 static void emu_load(rv_state *state, uint32_t iw)
 {
     uint32_t rd = get_bits(iw, 7, 5);                    
@@ -315,7 +331,7 @@ static void rv_one(rv_state *state) {
   uint32_t iw = *((uint32_t*) state->pc);
    iw = cache_lookup(&state->i_cache, (uint64_t)state->pc);
   uint32_t opcode = get_bits(iw, 0, 7);
-	state->analysis.i_count++;
+	
 #if DEBUG
   printf("iw: %x\n", iw);
 #endif
@@ -335,12 +351,13 @@ static void rv_one(rv_state *state) {
         emu_jalr(state, iw);
         state->analysis.j_count++;
         break;
-   
-    case FMT_I_LOAD:
+    case FMT_I_LOAD: 
     case FMT_I_ARITH:
         emu_i_type(state, iw);
         break;
-
+        
+	
+	
     case FMT_SB:
         emu_b_type(state, iw);
         break;
@@ -354,6 +371,7 @@ static void rv_one(rv_state *state) {
         emu_jal(state, iw);
         state->analysis.j_count++;
         break;
+        
     default:
       unsupported("unknown opcode - ", opcode);
     
