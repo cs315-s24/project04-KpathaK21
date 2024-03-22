@@ -1,6 +1,5 @@
-.align 4
 .global pal_rec_s
-
+.align 4
 /* pal_rec_s recursively calculates whether a string is a palindrome
     a0 is the string
     a1 is the start index to test

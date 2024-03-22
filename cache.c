@@ -4,6 +4,7 @@
 #include "rv_emu.h"
 
 
+
 void cache_init(struct cache_st *csp) {
 
     if (csp->type == CACHE_NONE) {
@@ -45,8 +46,11 @@ void cache_init(struct cache_st *csp) {
 void cache_print(struct cache_st *csp, char *name) {
     int num_slots_used = 0;
     int i;
-
-    for (i = 0; i < csp->size; i++) {
+    int num_slots;
+    
+	num_slots = csp->size / csp->block_size;
+	
+    for (i = 0; i < num_slots; i++) {
         if (csp->slots[i].valid == 1) {
             num_slots_used += 1;
         }
@@ -81,9 +85,10 @@ uint32_t cache_lookup_dm(struct cache_st *csp, uint64_t addr) {
     struct cache_slot_st *slot;
     uint32_t data = 0;
 
-    b_index = 0; // Need to change for block size > 1
-    index = (addr >> (csp->block_bits + 2)) & csp->index_mask;
-    tag = addr >> (csp->index_bits + csp->block_bits + 2);
+	uint64_t addr_word = addr >> 2;
+	b_index = addr_word & csp->block_mask;
+	index = (addr >> (csp->block_bits + 2)) & csp->index_mask;
+	tag = addr >> (csp->index_bits + csp->block_bits + 2);
 
     slot = &csp->slots[index];
 
@@ -109,15 +114,47 @@ uint32_t cache_lookup_dm(struct cache_st *csp, uint64_t addr) {
                     slot->tag, index, tag, addr);
             
         }
-        slot->valid = 1;
-        slot->tag = tag;
+		b_base = addr_word - b_index;
+		slot->valid = 1;
+		slot->tag = tag;
+	
+		for (int i = 0; i < csp->block_size; i++)
+		{
+			slot->block[i] = *(uint32_t *)((b_base + i) << 2);
+			if ((uint64_t)i == b_index)
+			{
+				data = *((uint32_t *)((b_base + i) << 2));
+			}
+		}
+	}
 
-        // Need to change for block size > 1
-        data = slot->block[b_index];
-    }
-    
-    return data;
+	return data;
 }
+
+struct cache_slot_st *find_lru_in_set(struct cache_st *csp, int set_base)
+{
+	
+	struct cache_slot_st *last_ref_in_set = &csp->slots[set_base];
+	
+	uint64_t min = last_ref_in_set->timestamp;
+	
+	for (int i = 1; i < csp->ways; i++)
+	{
+		
+		struct cache_slot_st *tmp = &csp->slots[set_base + i];
+		
+		if (tmp->timestamp < min)
+		{
+			
+			last_ref_in_set = &csp->slots[set_base + i];
+			
+			min = last_ref_in_set->timestamp;
+		}
+	}
+
+	return last_ref_in_set;
+}
+
 
 uint32_t cache_lookup_sa(struct cache_st *csp, uint64_t addr) {
     bool hit = false;
@@ -136,7 +173,7 @@ uint32_t cache_lookup_sa(struct cache_st *csp, uint64_t addr) {
 
     uint64_t tag = addr >> (csp->index_bits + csp->block_bits + 2);
 
-    uint64_t b_index = 1; // Need to change for block size > 1
+   	uint64_t b_index = (addr >> 2) & csp->block_mask; //  changed for block size > 1
 
     uint64_t b_base;
     int set_index = (addr >> (csp->block_bits + 2)) & csp->index_mask;
@@ -174,7 +211,7 @@ uint32_t cache_lookup_sa(struct cache_st *csp, uint64_t addr) {
             csp->misses_cold += 1;
         } else {
             // Always pick first slot in set - CHANGE TO LRU
-            slot = &(csp->slots[set_base]);
+           slot = find_lru_in_set(csp, set_base);
 
             verbose("  cache tag (%X) miss for set %d tag %X addr %X (evict address %X)\n",
                     slot->tag, set_index, tag, addr, 
@@ -187,8 +224,13 @@ uint32_t cache_lookup_sa(struct cache_st *csp, uint64_t addr) {
     }
 
     if (!hit) {
-        // Need to change for block size > 1        
-        slot->block[b_index] = *((uint32_t *) addr);
+        // changed for block size > 1        
+		b_base = (addr >> 2) - b_index;
+	
+		for (int i = 0; i < csp->block_size; i++)
+		{
+			slot->block[i] = *(uint32_t *)((b_base + i) << 2);
+		}
         slot->tag = tag;
         slot->valid = true;
     }
@@ -213,3 +255,6 @@ uint32_t cache_lookup(struct cache_st *csp, uint64_t addr) {
     }
     return data;
 }
+
+
+

@@ -17,6 +17,7 @@
 
 // Opcodes for instr formats
 typedef enum {
+	FMT_R_WORD  = 0b0111011,
     FMT_R       = 0b0110011,
     FMT_I_LOAD  = 0b0000011,
     FMT_I_JALR  = 0b1100111,
@@ -28,6 +29,7 @@ typedef enum {
 
 // Width values for FMT_I_LOAD and FMT_S
 #define LDST_BYTE   0
+#define LDST_HALF	1
 #define LDST_WORD   2
 #define LDST_DOUBLE 3
 
@@ -93,7 +95,6 @@ typedef struct {
 
     rv_analysis  analysis;
     struct cache_st i_cache;
-    uint8_t memory[STACK_SIZE];
 } rv_state;
 
 
